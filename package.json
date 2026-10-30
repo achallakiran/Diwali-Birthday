@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/main.js --bundle --minify --format=iife --outfile=app.js --legal-comments=linked",
-    "check": "node --check src/main.js"
+    "check": "node --check src/main.js && node --check src/software-renderer.js",
+    "test": "node --test src/navigation.test.js"
   },
   "dependencies": { "three": "0.180.0" },
   "devDependencies": { "esbuild": "0.28.2" }

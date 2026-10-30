@@ -7,11 +7,12 @@
   <meta name="description" content="A tiny world full of light, love and birthday wishes. Happy Diwali, and happy birthday Divya and Kaushiki!">
   <title>Lights, Love & Birthday Wishes · Divya & Kaushiki</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23241935'/%3E%3Cpath d='M12 38h40c-3 22-37 22-40 0' fill='%23d99a43'/%3E%3Cpath d='M32 9c-14 15-8 24 0 26 10-4 10-14 0-26' fill='%23ffe2a0'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="app.js?v=2" defer></script>
 </head>
 <body>
   <main id="poster" aria-label="Interactive voxel Diwali and birthday celebration for Divya and Kaushiki">
+    <div id="sky-glow" aria-hidden="true"></div>
     <div id="world" aria-label="A voxel family celebration. Drag to look around; tap the sky for fireworks."></div>
     <div class="vignette" aria-hidden="true"></div>
     <div class="frame" aria-hidden="true"><span>✧</span><span>✧</span><span>✧</span><span>✧</span></div>
@@ -23,26 +24,32 @@
       <p class="occasion-dates">DIVYA · 4 NOV <span>✧</span> KAUSHIKI & DIWALI · 8 NOV</p>
     </header>
     <aside class="utilities" aria-label="Poster settings">
-      <button id="motion" class="utility" title="Enable phone tilt" aria-label="Enable phone tilt" aria-pressed="false">↔</button>
-      <button id="sound" class="utility" title="Enable sound" aria-label="Enable sound" aria-pressed="false">♫</button>
+      <button id="sound" class="utility" title="Mute sound" aria-label="Mute sound" aria-pressed="true">♫</button>
       <button id="help" class="utility" title="How to interact" aria-label="How to interact" aria-expanded="false">?</button>
     </aside>
     <div id="toast" role="status" aria-live="polite"></div>
     <div id="help-panel" hidden>
       <strong>Make a little magic</strong>
       <p>Our home · Friday, 6 November 2026. Celebrating Divya's birthday (4 November), Kaushiki's birthday (8 November) and Diwali (8 November).</p>
-      <p>Tap the sky for fireworks. Tap each person for a surprise. Tap the cake to make a wish. Drag gently to explore the depth.</p>
-      <p>Use ↔ to enable phone tilt, or ♫ for sound.</p>
+      <p>Tap a person to select them, then tap an open spot on the floor to walk there. Tap the selected person again to dance. Done releases them to explore on their own.</p>
+      <p>Tap anywhere in the sky for an immediate colourful burst at your fingertip. Tap the cake to make a wish. Drag gently for parallax.</p>
+      <p>Sound starts with your first tap. ♫ mutes the fireworks and birthday music.</p>
       <div class="family-controls" aria-label="Meet the family"><button data-person="Ravi">Ravi</button><button data-person="Divya">Divya</button><button data-person="Kaushiki">Kaushiki</button><button data-person="Kaustubh">Kaustubh</button></div>
       <button id="gentle" aria-pressed="false">Gentle motion: off</button>
     </div>
     <footer>
-      <p class="hint" id="hint"><span aria-hidden="true">✧</span> Touch the sky. Make it sparkle.</p>
-      <div class="actions"><button id="wish"><span aria-hidden="true">♧</span> Make a wish</button><button id="celebrate"><span aria-hidden="true">✦</span> Light up the sky</button></div>
+      <p class="hint" id="hint"><span aria-hidden="true">✧</span> Tap the sky for fireworks · Select a person, then tap the floor to walk</p>
+      <div class="actions"><button id="wish"><span aria-hidden="true">♧</span> Make a wish</button><button id="celebrate"><span aria-hidden="true">✦</span> Light up the sky</button><button id="birthday-song">♫ Birthday tune</button><button id="deselect" hidden>Done</button></div>
       <p class="signature">WITH LOVE, RAVI & KAUSTUBH <span>✧</span></p>
     </footer>
     <div id="loading"><div class="loading-flame">✦</div><p>Lighting up your little world…</p></div>
     <div id="fallback" hidden><h2>Your little world needs 3D</h2><p>Try opening this page in Safari, Chrome or Edge with graphics acceleration enabled.</p><button onclick="location.reload()">Try again</button></div>
   </main>
+  <section id="rotate-prompt" role="dialog" aria-modal="true" aria-labelledby="rotate-title" hidden>
+    <div class="rotate-phone" aria-hidden="true"><svg viewBox="0 0 100 100"><rect x="29" y="12" width="42" height="76" rx="8"/><path d="M43 20h14M46 80h8"/></svg></div>
+    <h2 id="rotate-title">Turn your phone sideways</h2>
+    <p>A little more room for a lot more celebration.</p>
+    <span>Play in landscape</span>
+  </section>
 </body>
 </html>
