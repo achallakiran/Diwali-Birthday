@@ -1,38 +1,28 @@
 # Lights, Love & Birthday Wishes
 
-A living voxel celebration for Divya, Kaushiki, Ravi and Kaustubh. Made for **Friday, 6 November 2026, at our home**, celebrating Divya's birthday on 4 November and Kaushiki's birthday and Diwali on 8 November.
+A living voxel celebration for Divya, Kaushiki, Ravi and Kaustubh, for **Friday, 6 November 2026, at our home**. Divya's birthday is 4 November; Kaushiki's birthday and Diwali are 8 November.
 
 ## GitHub Pages
 
-The finished website is already built and checked in. No Actions workflow, server, API key or install is required to host it.
+The finished website is built and checked in. In **Settings → Pages**, select **Deploy from a branch → main → / (root)**. The site is at **https://achallakiran.github.io/Diwali-Birthday/**.
 
-1. Open this repository's **Settings → Pages**.
-2. Choose **Deploy from a branch**.
-3. Select **main** and **/ (root)**, then save.
-4. After GitHub finishes publishing, open **https://achallakiran.github.io/Diwali-Birthday/**.
+All paths are relative. `index.html`, `style.css` and `app.js` are the complete runtime. No server, keys, CDN scripts, remote fonts or downloaded models are needed.
 
-All asset paths are relative, so the repository subpath works. There are no CDN scripts, remote models, web fonts, analytics or runtime network requests. `index.html`, `style.css`, and the bundled `app.js` form the complete runtime; they can also be downloaded together and opened locally.
+## Living invitation
 
-## Explore the world
+The upper half carries large celebration text. The lower half holds the voxel family and room, with the floor available for exploring. There are no menus, buttons, character labels, instructions or selection/status messages during play.
 
-- The family walks, waves, dances and plays independently. Tap a person to select them; a turquoise ring marks the selection. Tap an open floor point to walk there, following a route around the cake table and gifts. Tap the same person again to dance, or **Done** to release them.
-- Tap any point in the night sky for an immediate multicolour firework centred at the touch. The sky also has regular ambient fireworks, layered colour and floating lanterns.
-- Tap the cake or **Make a wish**. Divya and Kaushiki lean forward; the candles go out, followed by confetti and fireworks. **Wish again** relights the candles.
-- Tap lantern-side diyas for sparkles or balloons to make them wobble.
-- Move the mouse or drag the world to explore its parallax depth.
-- Drag on touchscreens or move the desktop mouse for parallax. There are no arrow, orbit or tilt-mode controls.
-- The first tap unlocks sound. **♫** mutes/unmutes rocket whistles, explosion noise and the birthday tune. **Birthday tune** plays the melody; completing the cake wish also starts it. All audio is synthesized locally.
-- **?** opens keyboard-accessible character actions and the gentle-motion toggle. The operating system's reduced-motion preference is respected.
+Parallax is active by default, with a subtle idle drift. Dragging or moving the desktop mouse changes the view. The operating system's reduced-motion setting is respected. Play remains landscape-only; portrait displays the animated rotate-phone prompt and pauses the scene.
 
-## Rendering
+Interactions are intended to be discovered:
 
-The primary renderer uses Three.js, with actual 3D voxel geometry, articulated character parts, warm room lighting and shadows. Geometry is batched by articulated part; hidden matching interior voxel faces are omitted.
+- Tap the cake to start the Happy Birthday melody immediately, with a candle-blowing celebration. Subsequent taps can relight the candles. Repeated taps do not stack copies of the song.
+- Character taps alternate individually: select, dance, select, dance. A subtle ring marks a selection without text. Tap an open floor point to walk around the table and gifts. Dancing releases the character to resume exploring afterwards. Escape also clears the selection on desktop.
+- Tap the sky for a large rainbow firework exactly at the touch point. Screen-space fireworks preserve their centre as the parallax camera moves. Ambient rockets and fireworks also colour the sky.
+- Diyas sparkle and balloons wobble when touched.
+- Audio unlocks with the first user gesture. Fireworks use locally generated whistles and explosions; the birthday melody is synthesized locally.
 
-If WebGL is disabled, an automatic Canvas renderer draws the same geometry and animations. This mode retains movement, parallax, cake interactions and fireworks, with simpler lighting and a lower frame rate. The page displays a retry message only if both renderers fail.
-
-Play is landscape-only. In portrait, an animated phone asks the visitor to rotate; the scene pauses and its controls are inaccessible until landscape returns. On landscape phones, invitation text occupies a separate area beside the larger scene, while transient messages use the free sky space. Characters explore automatically until selected for point-and-click movement.
-
-## Edit and rebuild
+## Source and rebuild
 
 Use Node.js 20 or later:
 
@@ -43,24 +33,26 @@ npm test
 npm run build
 ```
 
-Commit the regenerated `app.js` and `app.js.LEGAL.txt` along with your source changes. GitHub Pages serves the root files directly.
+Commit the regenerated `app.js` and `app.js.LEGAL.txt` along with source changes. GitHub Pages serves the root files directly.
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Invitation text, dates, controls and accessible interaction buttons |
-| `style.css` | Responsive typography, invitation framing and controls |
-| `src/main.js` | Voxel models, scene, animation, effects, audio and input |
+| `index.html` | Celebration message, canvas surfaces and portrait gate |
+| `style.css` | Large upper-half typography and lower-half scene layout |
+| `src/main.js` | Voxel models, animation, cake interaction, audio and input |
+| `src/firework-sky.js` | Large screen-space rainbow fireworks and trails |
+| `src/navigation.js` | Floor navigation around room obstacles |
 | `src/software-renderer.js` | Animated Canvas compatibility renderer |
-| `src/navigation.js` | Ground-plane path finding and room obstacle boundaries |
-| `app.js` | Bundled local runtime including Three.js |
+| `app.js` | Bundled runtime including Three.js |
 | `THREE-LICENSE.txt` | Three.js MIT license |
 
-No party time or street address has been invented. Add those to the invitation when available.
+The primary renderer uses actual Three.js voxel geometry and articulated body parts, with warm lighting and shadows. If WebGL is disabled, a Canvas renderer draws the same room and moving characters with simpler lighting. Matching interior voxel faces are omitted, and each articulated part is batched into one mesh. Fireworks use a separate full-screen Canvas surface so bursts can span the sky independently of the lower-half scene.
+
+No party time or street address has been invented.
 
 ## Validation
 
-- JavaScript syntax checks and production bundling passed.
-- Browser checks covered the animated Canvas fallback, desktop play, the 390 × 844 portrait gate, 844 × 390 landscape layout, exact-touch fireworks, Web Audio activation and tune scheduling, selected-character path following, cake interactions and drag parallax.
-- Navigation tests verify direct walking, obstacle detours, and rejected blocked/out-of-room targets.
-- The preview browser disables WebGL, so the GPU renderer could not be visually checked there. Physical iPhone audio output should also be checked on a device.
-A unique birthday 
+- JavaScript syntax checks and the production bundle passed.
+- Navigation tests cover clear paths, detours around the cake table, and invalid targets.
+- Browser checks cover desktop and 844 × 390 landscape layout, the portrait gate, absence of visible menus/buttons/status text, direct cake-triggered tune scheduling, alternating character selection, walking and touch-centred fireworks.
+- The preview browser disables WebGL, so visual checks use the animated Canvas fallback. Physical-device audio output and GPU rendering still warrant a device check.

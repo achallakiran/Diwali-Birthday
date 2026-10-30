@@ -1,11 +1,11 @@
 {
   "name": "diwali-birthday",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "esbuild src/main.js --bundle --minify --format=iife --outfile=app.js --legal-comments=linked",
-    "check": "node --check src/main.js && node --check src/software-renderer.js",
+    "check": "node --check src/main.js && node --check src/software-renderer.js && node --check src/firework-sky.js",
     "test": "node --test src/navigation.test.js"
   },
   "dependencies": { "three": "0.180.0" },

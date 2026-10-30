@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SoftwareRenderer } from './software-renderer.js';
 import { findPath } from './navigation.js';
+import { FireworkSky } from './firework-sky.js';
 
 // Everything drawn here is local geometry. There are no remote models, textures or fonts.
 const $ = (id) => document.getElementById(id);
@@ -12,9 +13,9 @@ const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
 const state = { gentle: reducedQuery.matches, candles: true, wishing: false, wishUntil: 0, now: 0, sound: true, audioUnlocked:false, landscape:true, selected:null, lastAuto: 0, lastBurst:null, tuneCount:0, explosionCount:0 };
 const people = [], flames = [], bulbs = [], balloons = [], floaters = [], effects = [];
 const actionTimes = new Map();
-let renderer, scene, camera, firelight;
+let renderer, scene, camera, firelight, fireworkSky;
 let selectionRing,destinationRing;
-let lastTime = 0, elapsed = 0, toastUntil = 0, visible = true;
+let lastTime = 0, elapsed = 0, visible = true, lastParallaxInput=-10;
 const target = new THREE.Vector2(), current = new THREE.Vector2();
 const pointer = new THREE.Vector2(), raycaster = new THREE.Raycaster();
 const interactive = [];
@@ -144,13 +145,13 @@ function makeDecorations() {
   // Marigold toran across the open room.
   const flowers=new Blocks(), wire=new Blocks(), lights=new Blocks();
   for(let i=0;i<=110;i++) {
-    const x=-7.3+i/110*14.6, y=7.45-.45*Math.abs(Math.sin(i/110*Math.PI*4));
+    const x=-7.3+i/110*14.6, y=5.65-.45*Math.abs(Math.sin(i/110*Math.PI*4));
     flowers.box(x,y,-2.9,.17,.18,.18,pick(['#e39a30','#ffbd49','#e98329','#f2ae32']));
     if(i%4===0) flowers.box(x,y-.16,-2.9,.15,.2,.14,'#d9902f');
     if(i%12===0) for(let j=0;j<4;j++) flowers.box(x,y-.3-j*.13,-2.9,.14-j*.02,.15,.12,j===3?'#488b62':'#ed9b32');
   }
   for(let i=0;i<85;i++) {
-    const x=-7.9+i*.188,y=6.6-.7*Math.sin((x+7.9)/15.8*Math.PI);
+    const x=-7.9+i*.188,y=5.4-.7*Math.sin((x+7.9)/15.8*Math.PI);
     wire.box(x,y,-1.3,.2,.025,.025,'#bc9864');
     if(i%3===0) {lights.box(x,y-.12,-1.3,.08,.15,.08,pick(['#ffd890','#ffd4a0','#ffb485']));bulbs.push({x,y:y-.12,z:-1.3});}
   }
@@ -298,9 +299,7 @@ function makePerson(name,x,z,scale) {
   const routes={Ravi:[[-3.65,-.05],[-4.4,.25],[-4.6,-.9],[-3.65,-.05]],Divya:[[-1.25,-.6],[-1.9,-1.05],[-1,-1.3],[-1.25,-.6]],Kaushiki:[[1.45,-.1],[2.8,-1.4],[4.35,-1.3],[4.5,1.15],[2.8,.6],[1.45,-.1]],Kaustubh:[[3.65,.4],[4.9,1.5],[4.6,3.25],[2.8,3.6],[4.4,2.3],[3.65,.4]]};
   const person={name,root,actor,head,arms,legs,x,z,scale,phase:random()*6,route:routes[name],routeIndex:1,wait:1.5+random()*2,walking:false,idleSince:0};people.push(person);
   hitBox(root,0,2,0,1.75,4,1.3,'person',name);
-  // Small brass name plaques sit in front of each family member.
-  const label=group(root,0,.34/scale,.84/scale),b=new Blocks();b.box(0,0,0,1.28/scale,.27/scale,.08,'#513449').box(0,-.14/scale,0,1.36/scale,.035,.09,palette.gold);b.build(label);
-  textPlane(label,name,0,.01,.05,1.06/scale,'#ffe1a5',110,'Georgia',.22);
+
 }
 
 let cakeGroup, cakeHit;
@@ -327,7 +326,7 @@ function makeCake() {
   textPlane(cakeGroup,'HAPPY BIRTHDAY',0,.74,.57,1.1,'#ad426d',99,'Georgia',.19);
   textPlane(cakeGroup,'Divya & Kaushiki',0,.27,.84,1.65,'#fff1c8',88,'Georgia',.2);
   const topper=new Blocks();topper.box(0,1.29,-.15,.025,.64,.025,palette.gold).box(0,1.59,-.15,1.56,.36,.05,'#9c4b71');topper.build(cakeGroup);
-  textPlane(cakeGroup,'Make a wish',0,1.59,-.115,1.35,'#ffe1a5',105,'Georgia',.25);
+  textPlane(cakeGroup,'✦',0,1.59,-.115,1.35,'#ffe1a5',105,'Georgia',.25);
   // A number nine candle for Kaushiki, with ordinary candles for Divya.
   const nine=new Blocks(),pattern=['111','101','111','001','111'];
   pattern.forEach((row,y)=>[...row].forEach((v,x)=>{if(v==='1')nine.box(.3+(x-1)*.085,1.36-y*.085,.12,.08,.08,.1,'#f2b255');}));nine.build(cakeGroup);
@@ -354,49 +353,38 @@ function addParticle(x,y,z,vx,vy,vz,col,life=1.7,gravity=.8) {
   particles.push({x,y,z,vx,vy,vz,r:c.r,g:c.g,b:c.b,life,max:life,gravity});
 }
 const fireworkColors=['#ff4098','#ffda47','#38fff0','#a66bff','#ff853d','#8eff57','#ff67ef','#64b3ff'];
-function burst(x,y,z,col,style=0) {
-  const count=state.gentle?70:260,offset=Math.floor(random()*fireworkColors.length);
-  for(let i=0;i<count;i++) {
-    const a=random()*Math.PI*2,u=random()*2-1,s=Math.sqrt(1-u*u),speed=1.6+random()*2.4;
-    let vx=Math.cos(a)*s*speed,vy=u*speed,vz=Math.sin(a)*s*speed*.4;
-    if(style===1) {vx=Math.cos(i/count*Math.PI*2)*3;vy=Math.sin(i/count*Math.PI*2)*3;vz=(random()-.5)*.3;}
-    const rainbow=i%8===0?'#fffbd6':fireworkColors[(Math.floor(i/13)+offset)%fireworkColors.length];
-    addParticle(x,y,z,vx,vy,vz,rainbow,1.5+random()*1.3,.55);
-    if(i%5===0)addParticle(x,y,z,vx*.47,vy*.47,vz*.3,col,1+random(),.2);
-  }
-  firelight.color.set(col);firelight.position.set(x*.25,6,0);firelight.intensity=18;playExplosion();
-  state.lastBurst={x,y,z};
-}
-function launch(x=(random()-.5)*19,y=4.5+random()*3.5,z=-11) {
-  if(effects.length>12) return;
-  effects.push({kind:'rocket',x,y:2,z,tx:x,ty:y,age:0,duration:.65+random()*.35,col:pick(fireworkColors),style:random()>.6?1:0});
+function launch(x=(random()-.5)*19,y=4.5+random()*3.5) {
+  fireworkSky.launch(innerWidth*.5+x/24*innerWidth,Math.max(25,innerHeight*.25-(y-6)*innerHeight*.065));
   playWhistle();
   people.forEach(p=>{if(!actionTimes.has(p.name))p.lookUntil=state.now+2.4;});
 }
+
 function confetti(x,y,z) {
   for(let i=0;i<(state.gentle?25:100);i++)addParticle(x,y,z,(random()-.5)*5,2+random()*3,(random()-.5)*3,pick(fireworkColors),1.5+random()*1.5,2);
 }
 function sparkle(x,y,z) {for(let i=0;i<25;i++)addParticle(x,y,z,(random()-.5)*1.3,random()*1.8,(random()-.5)*1.3,'#ffe0a0',.6+random(),.4);}
-function showToast(message,duration=2600) {$('toast').textContent=message;$('toast').classList.add('visible');toastUntil=performance.now()+duration;}
-const personMessages={Ravi:'Ravi brings the dad dance!',Divya:'A little twirl for the birthday queen ✧',Kaushiki:'Nine years of sparkle! Happy birthday, Kaushiki!',Kaustubh:'Kaustubh says: let’s celebrate!'};
 function activatePerson(name) {
-  actionTimes.set(name,state.now);showToast(personMessages[name]);
+  actionTimes.set(name,state.now);
   const p=people.find(p=>p.name===name);if(p)sparkle(p.root.position.x,2.2*p.scale,p.root.position.z);
   playTone(name==='Kaustubh'?660:523,.16,'sine',.05);
 }
 function selectPerson(name) {
-  if(state.selected===name){activatePerson(name);return;}
-  if(state.selected){const previous=people.find(p=>p.name===state.selected);previous.manualPath=null;previous.wait=4;}
-  state.selected=name;const p=people.find(p=>p.name===name);p.manualPath=null;p.walking=false;actionTimes.delete(name);
-  $('deselect').hidden=false;updateHint();showToast(`${name} selected · Tap an open spot on the floor to walk`,3200);playTone(659,.12);
+  const p=people.find(p=>p.name===name);
+  if(state.selected&&state.selected!==name){const previous=people.find(p=>p.name===state.selected);previous.manualPath=null;previous.wait=4;}
+  p.tapCount=(p.tapCount||0)+1;
+  p.manualPath=null;p.walking=false;
+  if(p.tapCount%2===0){
+    state.selected=null;selectionRing.visible=false;destinationRing.visible=false;p.wait=4;
+    activatePerson(name);
+  }else{
+    state.selected=name;actionTimes.delete(name);playTone(659,.12);
+  }
 }
 function deselectPerson() {
   const p=people.find(p=>p.name===state.selected);if(p){p.manualPath=null;p.wait=3;p.walking=false;}
-  state.selected=null;selectionRing.visible=false;destinationRing.visible=false;$('deselect').hidden=true;updateHint();
+  state.selected=null;selectionRing.visible=false;destinationRing.visible=false;
 }
-function updateHint() {
-  $('hint').textContent=state.selected?`${state.selected} selected · Tap the floor to walk · Tap them again to dance`:'Tap the sky for fireworks · Select a person, then tap the floor to walk';
-}
+
 function makeMarkers() {
   function ring(color,radius) {
     const g=group(scene),b=new Blocks();for(let i=0;i<32;i++){const a=i/32*Math.PI*2;b.box(Math.cos(a)*radius,.11,Math.sin(a)*radius,.12,.04,.12,color);}b.build(g,'glow');g.visible=false;return g;
@@ -405,26 +393,21 @@ function makeMarkers() {
   hitBox(scene,0,.055,.9,15.6,.06,9.7,'floor');
 }
 function moveSelected(point) {
-  if(!state.selected){showToast('Tap a family member first, then tap the floor to walk.');return;}
+  if(!state.selected){return;}
   const p=people.find(p=>p.name===state.selected),radius=p.name==='Ravi'?.57:p.name==='Divya'?.5:.38;
   const path=findPath([p.root.position.x,p.root.position.z],[point.x,point.z],radius);
-  if(!path){showToast('Choose an open spot on the floor, away from the table and gifts.');return;}
+  if(!path){return;}
   p.manualPath=path;p.walking=true;actionTimes.delete(p.name);
   destinationRing.position.set(point.x,0,point.z);destinationRing.visible=true;
-  showToast(`${p.name} is on the way ✧`,1600);
+
 }
 function makeWish() {
+  playBirthdayTune();
   if(state.wishing)return;
-  if(!state.candles){state.candles=true;showToast('Another wish? The candles are glowing again.');playTone(880,.2);return;}
-  state.wishing=true;state.wishUntil=state.now+2.3;showToast('Make a wish, Divya & Kaushiki…',2300);
+  if(!state.candles){state.candles=true;playTone(880,.2);return;}
+  state.wishing=true;state.wishUntil=state.now+2.3;
   for(const name of ['Divya','Kaushiki'])actionTimes.set(name,state.now);
-  $('wish').disabled=true;
-}
-function celebrate() {
-  showToast('A sky full of wishes for Divya & Kaushiki ✧',3500);
-  [-7,-3.5,0,3.5,7].forEach((x,i)=>effects.push({kind:'scheduled',at:state.now+i*.33,x,y:5.1+(i%3)*.9}));
-  people.forEach(p=>actionTimes.set(p.name,state.now));
-  confetti(0,5,1);
+
 }
 let audioContext,masterGain,tuneUntil=0;
 function unlockAudio() {
@@ -448,8 +431,8 @@ function playWhistle() {
   const ctx=audioContext,t=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.setValueAtTime(430,t);osc.frequency.exponentialRampToValueAtTime(1600,t+.45);gain.gain.setValueAtTime(.012,t);gain.gain.exponentialRampToValueAtTime(.0001,t+.5);osc.connect(gain);gain.connect(masterGain);osc.start(t);osc.stop(t+.5);
 }
 function playBirthdayTune() {
-  if(!state.sound){showToast('Tap ♫ to turn sound on, then play the birthday tune.');return;}
-  if(!unlockAudio()){showToast('Tap the scene once to enable sound.');return;}
+  if(!state.sound){return;}
+  if(!unlockAudio()){return;}
   if(audioContext.currentTime<tuneUntil)return;
   const notes=[[60,1],[60,.5],[62,1.5],[60,1.5],[65,1.5],[64,3],[60,1],[60,.5],[62,1.5],[60,1.5],[67,1.5],[65,3],[60,1],[60,.5],[72,1.5],[69,1.5],[65,1.5],[64,1.5],[62,3],[70,1],[70,.5],[69,1.5],[65,1.5],[67,1.5],[65,3]];
   let time=audioContext.currentTime+.06;const beat=.32;
@@ -459,7 +442,7 @@ function playBirthdayTune() {
       gain.gain.setValueAtTime(.0001,time);gain.gain.exponentialRampToValueAtTime(level,time+.012);gain.gain.exponentialRampToValueAtTime(.0001,time+duration*.94);osc.connect(gain);gain.connect(masterGain);osc.start(time);osc.stop(time+duration);
     }time+=duration;
   }
-  tuneUntil=time;state.tuneCount++;showToast('Happy birthday, Divya & Kaushiki! ♫',5500);
+  tuneUntil=time;state.tuneCount++;
 }
 function playTone(freq,duration=.18,type='sine',volume=.04) {
   if(!state.sound||!state.audioUnlocked)return;
@@ -467,22 +450,23 @@ function playTone(freq,duration=.18,type='sine',volume=.04) {
     const osc=audioContext.createOscillator(),gain=audioContext.createGain(),t=audioContext.currentTime;
     osc.type=type;osc.frequency.setValueAtTime(freq,t);osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq*.55),t+duration);
     gain.gain.setValueAtTime(volume,t);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);osc.connect(gain);gain.connect(masterGain);osc.start(t);osc.stop(t+duration);
-  }catch {state.sound=false;$('sound').setAttribute('aria-pressed','false');showToast('Sound is unavailable in this browser.');}
+  }catch {state.sound=false;}
 }
 
 function resize() {
-  const width=innerWidth,height=innerHeight,aspect=width/height;
-  state.landscape=width>height;$('rotate-prompt').hidden=state.landscape;$('poster').inert=!state.landscape;
+  state.landscape=innerWidth>innerHeight;
+  $('rotate-prompt').hidden=state.landscape;$('poster').inert=!state.landscape;
   if(masterGain)masterGain.gain.setValueAtTime(state.landscape && state.sound ? .65 : 0,audioContext.currentTime);
   lastTime=0;
+  const rect=$('world').getBoundingClientRect(),width=rect.width,height=rect.height,aspect=width/height;
   renderer.setSize(width,height);renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
-  const compact=height<550&&aspect>1;
-  const viewHeight=compact?Math.max(12.8,21/aspect):Math.max(16.6,12.7/aspect);
+  fireworkSky.resize(innerWidth,innerHeight);
+  const viewHeight=Math.max(7.1,18.8/aspect);
   camera.left=-viewHeight*aspect/2;camera.right=viewHeight*aspect/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();
-  camera.userData.aimY=compact?4:4.8;camera.userData.aimX=compact?-3.4:0;camera.userData.distance=22;camera.userData.lift=6.4;
-  updateCamera();
-  renderer.render(scene,camera);
+  camera.userData.aimY=2;camera.userData.aimX=0;camera.userData.distance=22;camera.userData.lift=6.4;
+  updateCamera();renderer.render(scene,camera);
 }
+
 function updateCamera() {
   const aimY=camera.userData.aimY,aimX=camera.userData.aimX;
   camera.position.set(aimX+current.x*1.1,aimY+camera.userData.lift+current.y*.7,camera.userData.distance);
@@ -490,19 +474,18 @@ function updateCamera() {
 }
 function getHit(event) {
   scene.updateMatrixWorld();camera.updateMatrixWorld();
-  const rect=renderer.domElement.getBoundingClientRect();pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);return raycaster.intersectObjects(interactive,false)[0];
+  const rect=renderer.domElement.getBoundingClientRect();if(event.clientY<rect.top||event.clientY>rect.bottom)return null;pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);return raycaster.intersectObjects(interactive,false)[0];
 }
 function skyTap(event) {
-  getHit(event);
-  const plane=new THREE.Plane(new THREE.Vector3(0,0,1),11),point=new THREE.Vector3();
-  // No coordinate clamping and no queued rocket: the burst starts at the tap.
-  if(raycaster.ray.intersectPlane(plane,point))burst(point.x,point.y,-11,pick(fireworkColors),random()>.55?1:0);
+  fireworkSky.burst(event.clientX,event.clientY);
 }
+
 function bindInput() {
-  const canvas=renderer.domElement;let down=null;
+  const canvas=$('poster');let down=null;
   document.addEventListener('pointerdown',unlockAudio,{passive:true});
-  canvas.addEventListener('pointerdown',e=>{if(!state.landscape)return;down={x:e.clientX,y:e.clientY,id:e.pointerId,drag:false,tx:target.x,ty:target.y};canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener('pointerdown',e=>{if(!state.landscape)return;lastParallaxInput=state.now;down={x:e.clientX,y:e.clientY,id:e.pointerId,drag:false,tx:target.x,ty:target.y};canvas.setPointerCapture(e.pointerId);});
   canvas.addEventListener('pointermove',e=>{
+    lastParallaxInput=state.now;
     if(down) {
       const dx=e.clientX-down.x,dy=e.clientY-down.y;if(Math.hypot(dx,dy)>8)down.drag=true;
       if(down.drag&&!state.gentle){target.set(clamp(down.tx+dx/130,-1,1),clamp(down.ty+dy/180,-1,1));}
@@ -519,24 +502,17 @@ function bindInput() {
     }
     else if(hit.object.userData.kind==='cake')makeWish();
     else if(hit.object.userData.kind==='balloon'){const g=hit.object.parent;actionTimes.set(g.uuid,state.now);sparkle(g.position.x,g.position.y,g.position.z);playTone(440,.12);}
-    else if(hit.object.userData.kind==='diya'){const g=hit.object.parent;sparkle(g.position.x,g.position.y+.5,g.position.z);showToast('A little more light. A little more love.');playTone(1046,.18);}
+    else if(hit.object.userData.kind==='diya'){const g=hit.object.parent;sparkle(g.position.x,g.position.y+.5,g.position.z);playTone(1046,.18);}
   });
   canvas.addEventListener('pointercancel',()=>{down=null;});
   canvas.addEventListener('pointerleave',()=>{if(!down)target.set(0,0);});
-  $('wish').addEventListener('click',makeWish);$('celebrate').addEventListener('click',celebrate);
-  $('sound').addEventListener('click',()=>{state.sound=!state.sound;if(state.sound)unlockAudio();if(masterGain)masterGain.gain.setValueAtTime(state.sound ? .65 : 0,audioContext.currentTime);$('sound').setAttribute('aria-pressed',String(state.sound));$('sound').setAttribute('aria-label',state.sound?'Mute sound':'Enable sound');showToast(state.sound?'Sound on · Fireworks & birthday music':'Sound off');});
-  $('birthday-song').addEventListener('click',playBirthdayTune);$('deselect').addEventListener('click',deselectPerson);
-  $('help').addEventListener('click',()=>{const open=$('help-panel').hidden;$('help-panel').hidden=!open;$('help').setAttribute('aria-expanded',String(open));});
-  document.querySelectorAll('[data-person]').forEach(btn=>btn.addEventListener('click',()=>selectPerson(btn.dataset.person)));
-  $('gentle').addEventListener('click',()=>{state.gentle=!state.gentle;setGentleUI();target.set(0,0);});
-  reducedQuery.addEventListener('change',e=>{state.gentle=e.matches;setGentleUI();target.set(0,0);});setGentleUI();
+  reducedQuery.addEventListener('change',e=>{state.gentle=e.matches;target.set(0,0);});
   addEventListener('resize',resize);
   document.addEventListener('visibilitychange',()=>{visible=!document.hidden;lastTime=0;if(!visible&&audioContext)audioContext.suspend();if(visible&&audioContext&&state.sound&&state.landscape)audioContext.resume();});
-  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();showToast('The celebration is resting. Restoring the scene…',8000);});
-  canvas.addEventListener('webglcontextrestored',()=>showToast('The lights are back!'));
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('help-panel').hidden=true;$('help').setAttribute('aria-expanded','false');deselectPerson();target.set(0,0);}});
+  renderer.domElement.addEventListener('webglcontextlost',e=>e.preventDefault());
+  renderer.domElement.addEventListener('webglcontextrestored',resize);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){deselectPerson();target.set(0,0);}});
 }
-function setGentleUI() {$('gentle').textContent=`Gentle motion: ${state.gentle?'on':'off'}`;$('gentle').setAttribute('aria-pressed',String(state.gentle));}
 
 function updatePeople(t,dt) {
   for(const p of people) {
@@ -559,7 +535,7 @@ function updatePeople(t,dt) {
           p.actor.rotation.y=clamp(Math.atan2(dx,dz),-.65,.65);p.arms[0].rotation.x=-gait*.22;p.arms[1].rotation.x=gait*.22;
         } else {
           p.walking=false;
-          if(manual){p.manualPath.shift();if(!p.manualPath.length){p.manualPath=null;destinationRing.visible=false;showToast(`${p.name} has arrived · Tap another spot to keep exploring`,2200);}}
+          if(manual){p.manualPath.shift();if(!p.manualPath.length){p.manualPath=null;destinationRing.visible=false;}}
           else {p.routeIndex=(p.routeIndex+1)%p.route.length;p.wait=p.name==='Ravi'||p.name==='Divya'?6+random()*5:1.4+random()*2;p.idleSince=t;}
         }
       }
@@ -585,9 +561,7 @@ function updateEffects(dt,t) {
   for(let i=effects.length-1;i>=0;i--) {
     const e=effects[i];
     if(e.kind==='scheduled'){if(t>=e.at){launch(e.x,e.y,-11);effects.splice(i,1);}continue;}
-    e.age+=dt;const f=Math.min(1,e.age/e.duration),y=2+(e.ty-2)*f;
-    for(let j=0;j<3;j++)addParticle(e.x,y-j*.16,e.z,(random()-.5)*.12,-.3,(random()-.5)*.1,'#ffe4b0',.25,.1);
-    if(f>=1){burst(e.x,e.ty,e.z,e.col,e.style);effects.splice(i,1);}
+
   }
   for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;if(p.life<=0){particles.splice(i,1);continue;}p.vy-=p.gravity*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;}
   particles.forEach((p,i)=>{const k=i*3,f=Math.min(1,p.life/.55);particlePositions[k]=p.x;particlePositions[k+1]=p.y;particlePositions[k+2]=p.z;particleColors[k]=p.r*f;particleColors[k+1]=p.g*f;particleColors[k+2]=p.b*f;});
@@ -599,6 +573,7 @@ function frame(ms) {
   const realDelta=lastTime?Math.min(1,(ms-lastTime)/1000):0;
   const dt=Math.min(.25,realDelta);lastTime=ms;elapsed+=realDelta;state.now=elapsed;
   const t=elapsed;
+  if(!state.gentle&&t-lastParallaxInput>5)target.set(Math.sin(t*.22)*.22,Math.cos(t*.18)*.14);
   current.lerp(state.gentle?new THREE.Vector2():target,1-Math.exp(-dt*4));updateCamera();
   $('sky-glow').style.transform=`translate(${current.x*-15}px,${current.y*-10}px)`;
   updatePeople(t,dt);updateEffects(dt,t);
@@ -612,16 +587,17 @@ function frame(ms) {
   }
   for(const f of floaters){f.group.position.y=f.y+(state.gentle?0:Math.sin(t*.5+f.phase)*.08);f.group.rotation.z=state.gentle?0:Math.sin(t*.4+f.phase)*.025;}
   if(state.wishing&&t>=state.wishUntil) {
-    state.wishing=false;state.candles=false;$('wish').disabled=false;$('wish').innerHTML='<span aria-hidden="true">✧</span> Wish again';
-    showToast('Happy birthday, Divya & Kaushiki! ✧',5000);confetti(0,4.5,1.7);launch(-5,6);launch(5,7);if(state.sound)playBirthdayTune();
+    state.wishing=false;state.candles=false;
+    confetti(0,4.5,1.7);launch(-5,6);launch(5,7);
     for(const name of ['Divya','Kaushiki'])actionTimes.set(name,t);
   }
   if(t>3&&t-state.lastAuto>(state.gentle?18:3.8)) {state.lastAuto=t;launch((random()>.5?-1:1)*(5+random()*6),4.6+random()*3.4);}
-  if(performance.now()>toastUntil)$('toast').classList.remove('visible');
-  renderer.render(scene,camera);
+
+  renderer.render(scene,camera);fireworkSky.gentle=state.gentle;fireworkSky.update(dt);
   if(diagnostics){
-    const screen=state.lastBurst?new THREE.Vector3(state.lastBurst.x,state.lastBurst.y,state.lastBurst.z).project(camera):null;
-    renderer.domElement.dataset.snapshot=JSON.stringify({seconds:+t.toFixed(2),candles:state.candles,selected:state.selected,people:people.map(p=>({name:p.name,x:+p.root.position.x.toFixed(2),z:+p.root.position.z.toFixed(2),walking:p.walking,path:p.manualPath})),parallax:[+current.x.toFixed(2),+current.y.toFixed(2)],particles:particles.length,lastBurstScreen:screen?[(screen.x*.5+.5)*innerWidth,(-screen.y*.5+.5)*innerHeight]:null,tunes:state.tuneCount,explosions:state.explosionCount,audio:audioContext?.state});
+    const rect=renderer.domElement.getBoundingClientRect();
+    const projection=p=>{const v=p.clone().project(camera);return [(v.x*.5+.5)*rect.width+rect.left,(-v.y*.5+.5)*rect.height+rect.top];};
+    renderer.domElement.dataset.snapshot=JSON.stringify({seconds:+t.toFixed(2),candles:state.candles,selected:state.selected,people:people.map(p=>({name:p.name,x:+p.root.position.x.toFixed(2),z:+p.root.position.z.toFixed(2),walking:p.walking,path:p.manualPath,taps:p.tapCount||0,dancing:actionTimes.has(p.name),screen:projection(p.root.position.clone().add(new THREE.Vector3(0,2*p.scale,0)))})),parallax:[+current.x.toFixed(2),+current.y.toFixed(2)],particles:particles.length+fireworkSky.particles.length,lastBurstScreen:fireworkSky.lastBurst,cakeScreen:projection(new THREE.Vector3(0,2.15,1.76)),floorScreen:projection(new THREE.Vector3(3.3,.12,4.4)),tunes:state.tuneCount,explosions:state.explosionCount,audio:audioContext?.state});
   }
 }
 function boot() {
@@ -637,6 +613,7 @@ function boot() {
     const fill=new THREE.DirectionalLight('#c7b3ff',1.7);fill.position.set(8,7,-6);scene.add(fill);
     const warm=new THREE.PointLight('#ffb26d',24,17,2);warm.position.set(0,4,3);scene.add(warm);
     firelight=new THREE.PointLight('#ff99b7',0,35,1);scene.add(firelight);
+    fireworkSky=new FireworkSky($('fireworks'),colour=>{firelight.color.set(colour);firelight.position.set(0,5,1);firelight.intensity=20;playExplosion();});
     makeSky();makeRoom();makeDecorations();
     makePerson('Ravi',-3.65,-.05,1.12);makePerson('Divya',-1.25,-.6,1.02);makePerson('Kaushiki',1.45,-.1,.8);makePerson('Kaustubh',3.65,.4,.65);
     makeCake();makeMarkers();initParticles();resize();bindInput();renderer.render(scene,camera);
